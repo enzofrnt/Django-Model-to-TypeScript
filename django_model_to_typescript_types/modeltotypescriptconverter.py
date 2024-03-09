@@ -1,12 +1,15 @@
 # https://gist.github.com/emoss08/c87c9864ce2af470dc301ff64e39f857
 # https://gist.github.com/guizesilva/474fce56fcd5ab766e65e11e0dbff545
+import os
 
 from django.apps import apps
 from django.core.wsgi import get_wsgi_application
 
 class ModelToTypeScriptConverter:
-    def __init__(self, apps_to_include=["app"]):
-        self.apps_to_include = apps_to_include
+    def __init__(self, apps_to_include=['app'], path_for_interfaces='/tmp/tsinterface/', seperated_files=False):
+        self.apps_to_include = apps_to_include.split(',')
+        self.path_for_interfaces = path_for_interfaces
+        self.seperated_files = seperated_files
         self.field_type_mapping = {
             "AutoField": "number",
             "BooleanField": "boolean",
@@ -45,27 +48,54 @@ class ModelToTypeScriptConverter:
         # self.get_wsgi_application()
         all_models = apps.get_models()
 
-        with open("/interfaces.ts", "w") as file:
-            print("Generating interfaces.ts")
+        os.makedirs(os.path.dirname(self.path_for_interfaces), exist_ok=True)
+        if self.seperated_files:
             for model in all_models:
                 if model._meta.app_label not in self.apps_to_include:
                     continue
 
-                file.write(f"export interface {model.__name__}{' {'}\n")
+                with open(self.path_for_interfaces + model.__name__ + ".ts", "w") as file:
+                    print(f"Generating {model.__name__}.ts")
+                    file.write(f"export interface {model.__name__}{' {'}\n")
 
-                for field in model._meta.fields:
-                    _type = self.field_type_mapping.get(field.get_internal_type(), None)
-                    if _type is None:
+                    for field in model._meta.fields:
+                        _type = self.field_type_mapping.get(field.get_internal_type(), None)
+                        if _type is None:
+                            continue
+
+                        if field.choices:
+                            _type = self.to_type_union(field)
+
+                        name = self.to_camel_case(field.name)
+
+                        # If the field allows null values we add the ? to the type.
+                        if field.null:
+                            name += "?"
+
+                        file.write(f"\t{name}: {_type};\n")
+                    file.write("}\n\n")
+        else :
+            with open(self.path_for_interfaces + "interfaces.ts", "w") as file:
+                print("Generating interfaces.ts")
+                for model in all_models:
+                    if model._meta.app_label not in self.apps_to_include:
                         continue
 
-                    if field.choices:
-                        _type = self.to_type_union(field)
+                    file.write(f"export interface {model.__name__}{' {'}\n")
 
-                    name = self.to_camel_case(field.name)
+                    for field in model._meta.fields:
+                        _type = self.field_type_mapping.get(field.get_internal_type(), None)
+                        if _type is None:
+                            continue
 
-                    # If the field allows null values we add the ? to the type.
-                    if field.null:
-                        name += "?"
+                        if field.choices:
+                            _type = self.to_type_union(field)
 
-                    file.write(f"\t{name}: {_type};\n")
-                file.write("}\n\n")
+                        name = self.to_camel_case(field.name)
+
+                        # If the field allows null values we add the ? to the type.
+                        if field.null:
+                            name += "?"
+
+                        file.write(f"\t{name}: {_type};\n")
+                    file.write("}\n\n")
