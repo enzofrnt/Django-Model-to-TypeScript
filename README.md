@@ -27,9 +27,10 @@ To use this utility in your project, you can run the Django management command `
 
 ```
 usage: manage.py django2ts [--app APP] [--path PATH] [--separated-files] [--verbose]
+```
 
 And if you want you can also directly use the `ModelToTypeScriptConverter` class in your own code to generate TypeScript interfaces programmatically.
 
 ## Installation
 
-`pip install django-model-to-typescript-converter`
+`pip install dajngo-models-typescript-types`
