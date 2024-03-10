@@ -1,1 +1,1 @@
-# Django-Model-to-TypeScript-
+# Django-Model-to-TypeScript
