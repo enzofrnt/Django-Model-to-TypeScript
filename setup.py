@@ -11,14 +11,19 @@ setup(
     install_requires=[
         'django',
     ],
-    description='A package to create your Typescript types/models from your Django models.',
+    description='A package to create your Typescript Types/Models from your Django Models.',
     long_description=long_description,
      long_description_content_type="text/markdown",
-    author='Horou and Enzo_frnt',
-    url='https://github.com/Horou/djangorestframework-deepserializer',
+    author='Enzo_frnt',
+    url='https://github.com/enzofrnt/Django-Model-to-TypeScript',
     classifiers=[
         'Framework :: Django',
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
     ],
+    entry_points={
+        'console_scripts': [
+            'django2ts=django_model_to_typescript_types:main'
+        ],
+    },
 )

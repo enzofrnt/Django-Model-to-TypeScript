@@ -1,0 +1,1 @@
+from .modeltotypescriptconverter import ModelToTypeScriptConverter, main
