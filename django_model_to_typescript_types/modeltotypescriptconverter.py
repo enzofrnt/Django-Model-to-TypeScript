@@ -10,9 +10,11 @@ from django.core.wsgi import get_wsgi_application
 from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
 
 class ModelToTypeScriptConverter:
-    def __init__(self, apps_to_include=['app'], path_for_interfaces='/tmp/tsinterface/', separated_files=False, verbose=False):
-        self.apps_to_include = apps_to_include.split(',')
+    def __init__(self, apps_to_include=['app'], path_for_interfaces='/tmp/tsinterface/', excluded_models='', excluded_fields='', separated_files=False, verbose=False):
+        self.apps_to_include = apps_to_include.split(',') 
         self.path_for_interfaces = path_for_interfaces
+        self.excluded_models = excluded_models.split(',')
+        self.excluded_fields = excluded_fields.split(',')
         self.separated_files = separated_files if isinstance(separated_files, bool) else separated_files.lower() in ('true', '1', 't')
         self.field_type_mapping = {
             "AutoField": "number",
@@ -32,6 +34,7 @@ class ModelToTypeScriptConverter:
             "UUIDField": "string",
             "BigAutoField": "number",
         }
+        # self.field_type_mapping.update(extra_fields_to_ts)
         self.verbose = verbose        
         self.model_relations = {}
 
@@ -55,10 +58,12 @@ class ModelToTypeScriptConverter:
     def collect_model_relations(self, all_models):
         """Collects relations for each model to handle related_names in interfaces."""
         for model in all_models:
-            if model._meta.app_label not in self.apps_to_include:
+            if model._meta.app_label not in self.apps_to_include or model.__name__ in self.excluded_models:
                 continue
 
             for field in model._meta.fields + model._meta.many_to_many:
+                if field.name in self.excluded_fields :
+                    continue
                 if hasattr(field, 'remote_field') and field.remote_field:
                     related_model = field.related_model
                     related_name = field.remote_field.related_name or f'{model._meta.model_name}_set'
@@ -77,6 +82,8 @@ class ModelToTypeScriptConverter:
 
         # Generate field lines
         for field in model._meta.fields + model._meta.many_to_many:
+            if field.name in self.excluded_fields:
+                continue
             field_line, needs_import = self.generate_field_line(field)
             if field_line:
                 lines.append(f"\t{field_line}\n")
@@ -139,8 +146,8 @@ class ModelToTypeScriptConverter:
                     file.write(self.generate_interface_definition(model))
                     progress.update(generate_ts_models, advance=1)
 
-    def generate_interfaces(self, in_django=True):
-        if not in_django:
+    def generate_interfaces(self, in_django_app=True):
+        if not in_django_app:
             self.get_wsgi_application()
         
         
@@ -168,6 +175,8 @@ class ModelToTypeScriptConverter:
             ) as progress:
                 generate_ts_models = progress.add_task("[red]Converting Django Models to TypeScript Models...", total=len(all_models))
                 for model in all_models:
+                    if model.__name__ in self.excluded_models:
+                        continue
                     filename = model.__name__.lower() + ".ts"
                     progress.console.print(f"Generating {filename}")
                     self.generate_interface_file(model)
@@ -178,21 +187,27 @@ class ModelToTypeScriptConverter:
 def main():
     # Configuration du parseur d'arguments
     parser = argparse.ArgumentParser(description='Convert Django Models to TypeScript Models')
-    parser.add_argument('--apps_to_include', default='app', help='Comma separated list of apps to include')
-    parser.add_argument('--path_for_interfaces', default='/tmp/tsinterface/', help='Path for the TypeScript interfaces')
-    parser.add_argument('--separated_files', action='store_true', help='Generate separated files for each model')
+    parser.add_argument('--apps', default='app', help='Comma separated list of apps to include')
+    parser.add_argument('--path', default='/tmp/tsinterface/', help='Path for the TypeScript interfaces')
+    parser.add_argument('--exclude-models', default='', help='Comma separated list of models to exclude')
+    parser.add_argument('--exclude-fields', default='', help='Comma separated list of fields to exclude')
+    # parser.add_argument('--extra-fields-to-ts', default='', help='Extra fields to add to the mapping')
+    parser.add_argument('--files', action='store_true', help='Generate separated files for each model')
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
     args = parser.parse_args()
 
     # Conversion des arguments de ligne de commande
     apps_to_include = args.apps_to_include
     path_for_interfaces = args.path_for_interfaces
+    excluded_models = args.excluded_models
+    excluded_fields = args.excluded_fields
+    # extra_fields_to_ts = args.extra_fields_to_ts
     separated_files = args.separated_files
     verbose = args.verbose
 
     # Création et exécution du convertisseur
-    converter = ModelToTypeScriptConverter(apps_to_include, path_for_interfaces, separated_files, verbose)
-    converter.generate_interfaces(in_django=False)
+    converter = ModelToTypeScriptConverter(apps_to_include, path_for_interfaces, excluded_models, excluded_fields, separated_files, verbose)
+    converter.generate_interfaces(in_django_app=False)
 
 if __name__ == "__main__":
     main()
